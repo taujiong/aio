@@ -1,0 +1,29 @@
+configs:
+  traefik-config:
+    file: ./docker/traefik/traefik.yml
+
+services:
+  gateway:
+    image: traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    configs:
+      - source: traefik-config
+        target: /etc/traefik/traefik.yml
+    ports:
+      - '80:80'
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.http.routers.gateway.rule=Host(`gateway.${PUBLIC_DOMAIN}`)
+        - traefik.http.routers.gateway.service=api@internal
+        - traefik.http.services.gateway.loadbalancer.server.port=8080
+
+  echo:
+    image: traefik/whoami
+    deploy:
+      labels:
+        - traefik.http.routers.echo.rule=Host(`echo.${PUBLIC_DOMAIN}`)
+        - traefik.http.services.echo.loadbalancer.server.port=8080

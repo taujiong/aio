@@ -1,0 +1,11 @@
+entryPoints:
+  web:
+    address: ':80'
+
+providers:
+  docker:
+    endpoint: 'unix:///var/run/docker.sock'
+    swarmMode: true
+
+api:
+  dashboard: false
