@@ -1,6 +1,8 @@
 entryPoints:
   web:
     address: ':80'
+  websecure:
+    address: ':443'
 
 providers:
   docker:
@@ -9,3 +11,11 @@ providers:
 
 api:
   dashboard: false
+
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: '{{ env "EMAIL" }}'
+      storage: /certs/acme.json
+      httpChallenge:
+        entryPoint: web

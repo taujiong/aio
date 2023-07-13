@@ -1,17 +1,25 @@
+volumes:
+  traefik_certs:
+
 configs:
-  traefik-config:
+  traefik_config:
     file: ./docker/traefik/traefik.yml
+    template_driver: golang
 
 services:
   gateway:
     image: traefik
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - traefik_certs:/certs
     configs:
-      - source: traefik-config
+      - source: traefik_config
         target: /etc/traefik/traefik.yml
+    environment:
+      - EMAIL=${EMAIL}
     ports:
       - '80:80'
+      - '443:443'
     deploy:
       placement:
         constraints:
@@ -19,6 +27,8 @@ services:
       labels:
         - traefik.http.routers.gateway.rule=Host(`gateway.${PUBLIC_DOMAIN}`)
         - traefik.http.routers.gateway.service=api@internal
+        - traefik.http.routers.gateway.tls=true
+        - traefik.http.routers.gateway.tls.certresolver=myresolver
         - traefik.http.services.gateway.loadbalancer.server.port=8080
 
   echo:
@@ -26,4 +36,6 @@ services:
     deploy:
       labels:
         - traefik.http.routers.echo.rule=Host(`echo.${PUBLIC_DOMAIN}`)
-        - traefik.http.services.echo.loadbalancer.server.port=8080
+        - traefik.http.routers.echo.tls=true
+        - traefik.http.routers.echo.tls.certresolver=myresolver
+        - traefik.http.services.echo.loadbalancer.server.port=80
