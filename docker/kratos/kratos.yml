@@ -1,0 +1,126 @@
+dsn: 'postgres://{{ env "POSTGRES_USER" }}:{{ env "POSTGRES_PASSWORD" }}@database:5432/{{ env "POSTGRES_DB" }}?sslmode=disable&max_conns=20&max_idle_conns=4'
+
+serve:
+  public:
+    cors:
+      enabled: true
+    base_url: https://{{ env "AUTH_PORTAL" }}
+  admin:
+    base_url: http://auth:4434
+
+cookies:
+  domain: '{{ env "PUBLIC_DOMAIN"}}'
+
+session:
+  lifespan: 1h
+  earliest_possible_extend: 10m
+
+identity:
+  default_schema_id: 'default'
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+selfservice:
+  default_browser_return_url: https://{{ env "AUTH_UI_PORTAL" }}
+  allowed_return_urls:
+    - https://{{ env "AUTH_UI_PORTAL" }}
+  flows:
+    logout:
+      after:
+        default_browser_return_url: https://{{ env "AUTH_UI_PORTAL" }}
+    registration:
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/registration
+      lifespan: 10m
+      after:
+        password:
+          hooks:
+            - hook: session
+    login:
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/login
+      lifespan: 10m
+    verification:
+      enabled: true
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/verification
+      lifespan: 10m
+      use: code
+    recovery:
+      enabled: true
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/recovery
+      lifespan: 10m
+      use: code
+    error:
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/error
+    settings:
+      ui_url: https://{{ env "AUTH_UI_PORTAL" }}/settings
+      lifespan: 10m
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+  methods:
+    link:
+      enabled: false
+      config:
+        lifespan: 1h
+        base_url: https://{{ env "AUTH_UI_PORTAL" }}
+    code:
+      enabled: true
+      config:
+        lifespan: 1h
+    password:
+      enabled: true
+      config:
+        haveibeenpwned_enabled: true
+        max_breaches: 5
+        ignore_network_errors: true
+        min_password_length: 6
+        identifier_similarity_check_enabled: true
+    totp:
+      config:
+        issuer: Aio
+      enabled: true
+    lookup_secret:
+      enabled: true
+    webauthn:
+      enabled: false
+      config:
+        rp:
+          id: '{{ env "AUTH_UI_PORTAL" }}'
+          display_name: 'Aio App'
+          icon: 'https://www.ory.sh/favicon-32x32.png'
+          origin: https://{{ env "AUTH_UI_PORTAL" }}/login
+        passwordless: false
+    oidc:
+      enabled: false
+    profile:
+      enabled: false
+
+courier:
+  message_retries: 5
+  delivery_strategy: smtp
+  smtp:
+    connection_uri: 'smtp://{{ env "SMTP_URI"}}'
+    # client_cert_path:
+    # client_key_path:
+    from_address: no-reply@auth.aio.app
+    local_name: aio
+
+ciphers:
+  algorithm: noop
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 8
+
+secrets:
+  cookie:
+    - ipsumipsumipsumi
+  cipher:
+    - ipsumipsumipsumipsumipsumipsumip
+  default:
+    - ipsumipsumipsumi
+
+log:
+  leak_sensitive_values: false
+  format: json
+  level: debug

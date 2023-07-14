@@ -5,6 +5,11 @@ configs:
   traefik_config:
     file: ./docker/traefik/traefik.yml
     template_driver: golang
+  kratos_config:
+    file: ./docker/kratos/kratos.yml
+    template_driver: golang
+  kratos_id_schema:
+    file: ./docker/kratos/identity.schema.json
 
 services:
   gateway:
@@ -25,6 +30,7 @@ services:
         constraints:
           - node.role == manager
       labels:
+        - traefik.enable=true
         - traefik.http.routers.gateway.rule=Host(`gateway.${PUBLIC_DOMAIN}`)
         - traefik.http.routers.gateway.service=api@internal
         - traefik.http.routers.gateway.tls=true
@@ -35,7 +41,70 @@ services:
     image: traefik/whoami
     deploy:
       labels:
+        - traefik.enable=true
         - traefik.http.routers.echo.rule=Host(`echo.${PUBLIC_DOMAIN}`)
         - traefik.http.routers.echo.tls=true
         - traefik.http.routers.echo.tls.certresolver=myresolver
         - traefik.http.services.echo.loadbalancer.server.port=80
+
+  database:
+    image: postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+
+  auth:
+    image: oryd/kratos
+    command: serve -c /etc/config/kratos/kratos.yml
+    configs:
+      - source: kratos_config
+        target: /etc/config/kratos/kratos.yml
+      - source: kratos_id_schema
+        target: /etc/config/kratos/identity.schema.json
+    environment:
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+      - AUTH_PORTAL=auth.${PUBLIC_DOMAIN}
+      - AUTH_UI_PORTAL=me.${PUBLIC_DOMAIN}
+      - SMTP_URI=${SMTP_URI}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.auth.rule=Host(`auth.${PUBLIC_DOMAIN}`)
+        - traefik.http.routers.auth.service=auth
+        - traefik.http.routers.auth.tls=true
+        - traefik.http.routers.auth.tls.certresolver=myresolver
+        - traefik.http.services.auth.loadbalancer.server.port=4433
+
+  auth_migrate:
+    image: oryd/kratos
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    configs:
+      - source: kratos_config
+        target: /etc/config/kratos/kratos.yml
+    environment:
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+      - UI_PORTAL=me.${PUBLIC_DOMAIN}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    deploy:
+      restart_policy:
+        condition: none
+
+  auth_ui:
+    image: oryd/kratos-selfservice-ui-node
+    environment:
+      - KRATOS_PUBLIC_URL=http://auth:4433
+      - KRATOS_BROWSER_URL=https://auth.${PUBLIC_DOMAIN}
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.auth_ui.rule=Host(`me.${PUBLIC_DOMAIN}`)
+        - traefik.http.routers.auth_ui.service=auth_ui
+        - traefik.http.routers.auth_ui.tls=true
+        - traefik.http.routers.auth_ui.tls.certresolver=myresolver
+        - traefik.http.services.auth_ui.loadbalancer.server.port=3000
